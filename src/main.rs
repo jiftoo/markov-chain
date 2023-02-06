@@ -102,8 +102,8 @@ fn main() {
 		.map(|x| x.to_string())
 		.collect::<Vec<_>>();
 	let text = generate_text(
-		30,
-		12..64,
+		10,
+		5..32,
 		// &first_tokens,
 		first_tokens_full.as_slice(),
 		&markov_matrix,
