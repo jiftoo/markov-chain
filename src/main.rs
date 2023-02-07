@@ -11,7 +11,7 @@ mod markov;
 fn display_words(input: Vec<Vec<String>>) {
 	for sentence in input {
 		println!(
-			"{:?}",
+			"-{:?}",
 			sentence.iter().skip(1).fold(
 				sentence[0]
 					.chars()
