@@ -1,11 +1,12 @@
-use std::ops::{Bound, Range, RangeBounds};
+use std::{
+	hash::Hash,
+	ops::{Bound, Range, RangeBounds},
+};
 
 use itertools::Itertools;
 use rand::{
 	distributions::WeightedIndex, prelude::Distribution, seq::SliceRandom, thread_rng, Rng,
 };
-
-use crate::input::Sentences;
 
 // More comprehensible
 pub trait ClosedRange {
@@ -32,53 +33,34 @@ where
 	}
 }
 
-pub struct MarkovChain {
-	tokens: Vec<String>,
-	first_token_count: usize,
+pub struct MarkovChain<T> {
+	tokens: Vec<T>,
 	matrix: Vec<f32>, // Don't actually need a matrix struct
 }
 
-impl MarkovChain {
+impl<T: Clone + Eq + Hash> MarkovChain<T> {
 	/// Create a new MarkovChain from existing data
-	pub fn new(tokens: &[String], first_token_count: usize, matrix: Vec<f32>) -> Self {
+	pub fn new(tokens: &[T], matrix: Vec<f32>) -> Self {
 		Self {
-			tokens: tokens.iter().unique().cloned().collect::<Vec<String>>(),
-			first_token_count,
+			tokens: tokens.iter().unique().cloned().collect::<Vec<T>>(),
 			matrix,
 		}
 	}
 
-	pub fn from_sentences(sentences: Sentences) -> Self {
-		let possible_tokens = sentences
-			.iter()
-			.flatten()
-			.unique()
-			.cloned()
-			.collect::<Vec<_>>();
+	pub fn from_grouped_data(data: Vec<Vec<T>>) -> MarkovChain<T> {
+		let possible_tokens = data.iter().flatten().unique().cloned().collect::<Vec<_>>();
 
 		let number_of_tokens = possible_tokens.len();
 
 		let mut matrix = vec![0.0; number_of_tokens * number_of_tokens];
 		for (token_index, token) in possible_tokens.iter().enumerate() {
-			let mut next_tokens = vec![];
-			for x in &sentences {
-				if x.len() < 2 {
-					break;
-				}
-				x.windows(2).for_each(|ab| {
-					if let Ok([a, b]) = TryInto::<&[String; 2]>::try_into(ab) {
-						if a == token {
-							next_tokens.push(b.as_str());
-						}
-					}
-				})
-			}
+			let next_tokens = Self::find_next_tokens(token, &data);
 
 			let accessible_token_count = next_tokens.len() as f32;
 			for next_token in next_tokens {
 				let next_token_index = possible_tokens
 					.iter()
-					.position(|x| *x == next_token)
+					.position(|x| x == next_token)
 					.unwrap();
 				matrix[token_index * number_of_tokens + next_token_index] +=
 					1.0 / accessible_token_count;
@@ -87,39 +69,53 @@ impl MarkovChain {
 
 		Self {
 			tokens: possible_tokens,
-			first_token_count: sentences.len(),
 			matrix,
 		}
 	}
 
-	pub fn get_tokens(&self) -> &[String] {
+	pub fn from_continuous_data(data: Vec<T>) -> Self {
+		Self::from_grouped_data(vec![data])
+	}
+
+	pub fn get_tokens(&self) -> &[T] {
 		&self.tokens
 	}
 
-	pub fn get_first_tokens(&self) -> &[String] {
-		&self.tokens[..self.first_token_count]
+	fn find_next_tokens<'a>(current_token: &'a T, data: &'a Vec<Vec<T>>) -> Vec<&'a T> {
+		let mut next_tokens = vec![];
+		// data.len() == 1 in case of continuous data
+		for x in data {
+			if x.len() < 2 {
+				break;
+			}
+			x.windows(2).for_each(|ab| {
+				if let Ok([a, b]) = TryInto::<&[T; 2]>::try_into(ab) {
+					if a == current_token {
+						next_tokens.push(b);
+					}
+				}
+			})
+		}
+
+		next_tokens
 	}
 
-	pub fn generate_text(
+	pub fn generate(
 		&self,
 		sentence_count: usize,
 		sentence_length_bounds: impl ClosedRange,
-	) -> Result<Vec<String>, &'static str> {
+	) -> Result<Vec<Vec<T>>, &'static str> {
 		self.assert_able_to_generate()?;
 
 		let mut rng = thread_rng();
 
-		let first_tokens = &self.get_first_tokens();
+		let mut sentences = Vec::with_capacity(sentence_count);
+		for _ in 0..sentence_count {
+			let mut sentence = Vec::new();
 
-		let mut sentences = vec![String::new(); sentence_count];
-		for sentence in sentences.iter_mut() {
-			let mut current_token = first_tokens.choose(&mut rng).unwrap().as_str();
+			let mut current_token = self.tokens.choose(&mut rng).unwrap();
 
-			*sentence += &format!(
-				"{}{}",
-				&(current_token.as_bytes()[0] as char).to_uppercase(),
-				&current_token[1..]
-			);
+			sentence.push(current_token.clone());
 
 			let random_sentence_length = rng.gen_range(sentence_length_bounds.as_open_range());
 			for _ in 0..random_sentence_length {
@@ -129,14 +125,10 @@ impl MarkovChain {
                 };
 
 				current_token = next_token;
-				if current_token == "," {
-					*sentence += current_token;
-				} else {
-					*sentence += &format!(" {}", current_token);
-				}
+				sentence.push(current_token.clone());
 			}
 
-			*sentence += ".";
+			sentences.push(sentence);
 		}
 
 		Ok(sentences)
@@ -146,23 +138,16 @@ impl MarkovChain {
 		if self.get_tokens().is_empty() {
 			return Err("No tokens found");
 		}
-		if self.get_first_tokens().is_empty() {
-			return Err("No first tokens found");
-		}
 		// ...
 
 		Ok(())
 	}
 
-	fn generate_next_token<'a>(&'a self, current_token: &'a str) -> Option<&'a str> {
+	fn generate_next_token<'a>(&'a self, current_token: &'a T) -> Option<&'a T> {
 		let mut rng = thread_rng();
 
 		let next_token_weights = {
-			let token_index = self
-				.tokens
-				.iter()
-				.position(|x| *x == current_token)
-				.unwrap();
+			let token_index = self.tokens.iter().position(|x| x == current_token).unwrap();
 			let row_offset = self.tokens.len() * token_index;
 			&self.matrix[row_offset..row_offset + self.tokens.len()]
 		};
