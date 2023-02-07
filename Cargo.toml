@@ -6,7 +6,6 @@ edition = "2021"
 [dependencies]
 itertools = "0.10.5"
 rand = "0.8.5"
-rulinalg = "0.4.2"
 
 [profile.release]
 opt-level = 3
