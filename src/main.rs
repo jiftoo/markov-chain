@@ -30,6 +30,22 @@ fn display_text_bytes(input: Vec<Vec<u8>>) {
 	}
 }
 
+fn print_table(markov_chain: &markov::MarkovChain<String>) {
+	let headers = markov_chain
+		.tokens()
+		.iter()
+		.map(|x| x.chars().take(7).collect::<String>())
+		.collect::<Vec<_>>();
+	println!("\t{}", headers.join("\t"));
+	for (c, h) in markov_chain
+		.matrix()
+		.chunks_exact(markov_chain.tokens().len())
+		.zip(&headers)
+	{
+		println!("{}\t{}", h, c.iter().map(|x| x.to_string()).join("\t"));
+	}
+}
+
 fn main() {
 	let text = include_str!("genesis.txt");
 
