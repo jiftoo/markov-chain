@@ -1,3 +1,6 @@
+use itertools::Itertools;
+
+mod dist;
 mod input;
 mod markov;
 
