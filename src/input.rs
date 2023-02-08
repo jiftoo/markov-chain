@@ -1,10 +1,12 @@
 pub type Sentences = Vec<Vec<String>>;
 
 pub fn format_input(text: &str) -> Sentences {
-	let tokens = text.replace(
-		|x: char| !x.is_alphabetic() && x != '.' && x != ',' && x != ' ',
-		"",
-	);
+	let tokens = text
+		.replace(|x| x == '!' || x == '?' || x == ';', ".")
+		.replace(
+			|x: char| !x.is_alphabetic() && x != '.' && x != ',' && x != ' ',
+			"",
+		);
 
 	let mut first_tokens: Vec<String> = vec![];
 
