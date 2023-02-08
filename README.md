@@ -1,8 +1,9 @@
+
 # A Markov chain text generator written in Rust 🚀
 It's messy, but gets the job done!
 
 Note: input and generation parameters are hard-coded into the executable. I'm not currently planning to implement a user interface.
- 
+ ## Generation
 1. Input: `gpt_nonesense.txt` - short text by GPT-3
   Output:
 	> Reality, western philosophers have explored the ancient greeks, a lack, nothingness, a possibility, energy, a void that all meaning, and scholars alike.
@@ -27,3 +28,13 @@ Grew for the bondwoman in the food but they said, in it and laban went forth, th
 Discerned him, when she sent and zeboim, after he said unto joseph said.
 Nineteen years, and he said.
 Embalm his firstborn esau was dry.
+
+## Steady state
+`dist::steady_state` may be used to figure out whether the input data is random or not. The following is the output of the function, graphed. Note that the output also is sorted for clarity.
+
+<p align="center">
+  <img src="https://user-images.githubusercontent.com/39745401/217668013-ab60a125-d0ac-4712-b717-d2c586db1d5a.png" width="45%" /> 
+  <img src="https://user-images.githubusercontent.com/39745401/217668026-f04f07cd-46f4-4ff1-a146-0d9e5ece8648.png" width="45%" />
+</p>
+
+
