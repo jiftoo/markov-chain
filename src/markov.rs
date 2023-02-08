@@ -1,4 +1,5 @@
 use std::{
+	fmt::{Debug, Display},
 	hash::Hash,
 	ops::{Bound, Range, RangeBounds},
 };
@@ -56,16 +57,28 @@ impl<T: Clone + Eq + Hash> MarkovChain<T> {
 		for (token_index, token) in possible_tokens.iter().enumerate() {
 			let next_tokens = Self::find_next_tokens(token, &data);
 
-			let accessible_token_count = next_tokens.len() as f32;
-			for next_token in next_tokens {
-				let next_token_index = possible_tokens
-					.iter()
-					.position(|x| x == next_token)
-					.unwrap();
-				matrix[token_index * number_of_tokens + next_token_index] +=
-					1.0 / accessible_token_count;
+			let accessible_token_count = next_tokens.len();
+			if next_tokens.is_empty() {
+				// Can go to any token if there's not real next tokens
+				let l = token_index * number_of_tokens;
+				let h = l + number_of_tokens;
+				matrix[l..h].fill(1.0 / possible_tokens.len() as f32);
+			} else {
+				for next_token in next_tokens {
+					let next_token_index = possible_tokens
+						.iter()
+						.position(|x| x == next_token)
+						.unwrap();
+					matrix[token_index * number_of_tokens + next_token_index] +=
+						1.0 / accessible_token_count as f32;
+				}
 			}
 		}
+
+		assert!(matrix.chunks_exact(number_of_tokens).all(|chunk| {
+			let sum: f32 = chunk.iter().sum();
+			(sum - 1.0).abs() < 0.0001
+		}));
 
 		Self {
 			tokens: possible_tokens,
@@ -77,8 +90,12 @@ impl<T: Clone + Eq + Hash> MarkovChain<T> {
 		Self::from_grouped_data(vec![data])
 	}
 
-	pub fn get_tokens(&self) -> &[T] {
+	pub fn tokens(&self) -> &[T] {
 		&self.tokens
+	}
+
+	pub fn matrix(&self) -> &[f32] {
+		&self.matrix
 	}
 
 	fn find_next_tokens<'a>(current_token: &'a T, data: &'a Vec<Vec<T>>) -> Vec<&'a T> {
@@ -86,7 +103,7 @@ impl<T: Clone + Eq + Hash> MarkovChain<T> {
 		// data.len() == 1 in case of continuous data
 		for x in data {
 			if x.len() < 2 {
-				break;
+				continue;
 			}
 			x.windows(2).for_each(|ab| {
 				if let Ok([a, b]) = TryInto::<&[T; 2]>::try_into(ab) {
@@ -135,7 +152,7 @@ impl<T: Clone + Eq + Hash> MarkovChain<T> {
 	}
 
 	fn assert_able_to_generate(&self) -> Result<(), &'static str> {
-		if self.get_tokens().is_empty() {
+		if self.tokens().is_empty() {
 			return Err("No tokens found");
 		}
 		// ...
