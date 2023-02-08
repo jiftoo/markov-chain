@@ -51,18 +51,32 @@ fn print_table(markov_chain: &markov::MarkovChain<String>) {
 
 fn main() {
 	let text = include_str!("genesis.txt");
+	// let mut text = [0; 2_usize.pow(16)];
+	// rand::thread_rng().fill_bytes(&mut text);
 
 	let sentences = input::format_input(text);
 	let markov_chain = markov::MarkovChain::from_grouped_data(sentences);
 
+	// let markov_chain = markov::MarkovChain::from_continuous_data(text.to_vec());
+
+	let dist = dist::steady_state(&markov_chain);
+
+	println!(
+		"Distribution: {:?}",
+		dist.iter()
+			.map(|x| x * 1000.0)
+			.sorted_by(|a, b| b.partial_cmp(a).unwrap())
+			.collect::<Vec<_>>()
+	);
+
 	// let bytes = input::format_input(text).into_iter().flatten().flat_map(|x| x.into_bytes()).collect::<Vec<_>>();
 	// let markov_chain = markov::MarkovChain::from_continuous_data(bytes);
 
-	let text = markov_chain.generate(20, 5..128);
+	// let text = markov_chain.generate(20, 5..128);
 
-	match text {
-		Ok(text) => display_words(text),
-		// Ok(text) => display_text_bytes(text),
-		Err(e) => println!("{}", e),
-	}
+	// match text {
+	// 	Ok(text) => display_words(text),
+	// 	// Ok(text) => display_text_bytes(text),
+	// 	Err(e) => println!("{}", e),
+	// }
 }
