@@ -38,6 +38,7 @@ pub struct MarkovChain<T> {
 	matrix: Vec<f32>, // Don't actually need a matrix struct
 }
 
+#[allow(dead_code)]
 impl<T: Clone + Eq + Hash> MarkovChain<T> {
 	/// Create a new MarkovChain from existing data
 	pub fn new(tokens: &[T], matrix: Vec<f32>) -> Self {

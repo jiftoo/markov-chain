@@ -1,4 +1,12 @@
-use itertools::Itertools;
+use std::fs::File;
+
+use std::io::Read;
+
+use clap::arg;
+use clap::command;
+use clap::Parser;
+use input::format_input;
+use markov::MarkovChain;
 
 mod dist;
 mod input;
@@ -14,7 +22,7 @@ mod markov;
 fn display_words(input: Vec<Vec<String>>) {
 	for sentence in input {
 		println!(
-			"-{:?}",
+			"{}",
 			sentence.iter().skip(1).fold(
 				sentence[0]
 					.chars()
@@ -33,50 +41,92 @@ fn display_text_bytes(input: Vec<Vec<u8>>) {
 	}
 }
 
-fn print_table(markov_chain: &markov::MarkovChain<String>) {
-	let headers = markov_chain
-		.tokens()
-		.iter()
-		.map(|x| x.chars().take(7).collect::<String>())
-		.collect::<Vec<_>>();
-	println!("\t{}", headers.join("\t"));
-	for (c, h) in markov_chain
-		.matrix()
-		.chunks_exact(markov_chain.tokens().len())
-		.zip(&headers)
-	{
-		println!("{}\t{}", h, c.iter().map(|x| x.to_string()).join("\t"));
+// fn print_table(markov_chain: &markov::MarkovChain<String>) {
+// 	let headers = markov_chain
+// 		.tokens()
+// 		.iter()
+// 		.map(|x| x.chars().take(7).collect::<String>())
+// 		.collect::<Vec<_>>();
+// 	println!("\t{}", headers.join("\t"));
+// 	for (c, h) in markov_chain
+// 		.matrix()
+// 		.chunks_exact(markov_chain.tokens().len())
+// 		.zip(&headers)
+// 	{
+// 		println!("{}\t{}", h, c.iter().map(|x| x.to_string()).join("\t"));
+// 	}
+// }
+
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+	/// Parse as binary instead of sentences
+	#[arg(short, default_value_t = false)]
+	binary: bool,
+	/// Treat input as file path
+	#[arg(short, default_value_t = false)]
+	file: bool,
+	/// Number of sentences to generate
+	#[arg(short, default_value_t = 1)]
+	s_number_of_sentences: usize,
+	/// Number or range of tokens per sentence <length|low-high>
+	#[arg(short, default_value = "20")]
+	t_number_of_tokens: String,
+	/// Input string, or file path (if -f is set)
+	input: Vec<String>,
+}
+
+fn read_input(args: &Args) -> Result<String, String> {
+	let input = args.input.join(" ");
+	if args.file {
+		let mut file = File::open(input).map_err(|x| x.to_string())?;
+		let mut buf = Vec::new();
+		file.read_to_end(&mut buf).map_err(|x| x.to_string())?;
+		String::from_utf8(buf).map_err(|x| x.to_string())
+	} else {
+		Ok(input)
 	}
 }
 
 fn main() {
-	let text = include_str!("genesis.txt");
-	// let mut text = [0; 2_usize.pow(16)];
-	// rand::thread_rng().fill_bytes(&mut text);
+	let args = Args::parse();
+	let length_range = if args.t_number_of_tokens.contains('-') {
+		let range = args
+			.t_number_of_tokens
+			.split('-')
+			.map(|x| x.parse::<usize>().unwrap())
+			.collect::<Vec<_>>();
+		if range.len() != 2 {
+			println!("Invalid range");
+			return;
+		}
+		range[0]..=range[1]
+	} else {
+		let n = args.t_number_of_tokens.parse::<usize>().unwrap();
+		n..=n
+	};
 
-	let sentences = input::format_input(text);
-	let markov_chain = markov::MarkovChain::from_grouped_data(sentences);
+	let input_data = match read_input(&args) {
+		Ok(input_data) => input_data,
+		Err(e) => {
+			println!("{}", e);
+			return;
+		}
+	};
 
-	// let markov_chain = markov::MarkovChain::from_continuous_data(text.to_vec());
-
-	let dist = dist::steady_state(&markov_chain);
-
-	println!(
-		"Distribution: {:?}",
-		dist.iter()
-			.map(|x| x * 1000.0)
-			.sorted_by(|a, b| b.partial_cmp(a).unwrap())
-			.collect::<Vec<_>>()
-	);
-
-	// let bytes = input::format_input(text).into_iter().flatten().flat_map(|x| x.into_bytes()).collect::<Vec<_>>();
-	// let markov_chain = markov::MarkovChain::from_continuous_data(bytes);
-
-	// let text = markov_chain.generate(20, 5..128);
-
-	// match text {
-	// 	Ok(text) => display_words(text),
-	// 	// Ok(text) => display_text_bytes(text),
-	// 	Err(e) => println!("{}", e),
-	// }
+	if args.binary {
+		let markov_chain = MarkovChain::from_continuous_data(input_data.into_bytes());
+		let output = markov_chain.generate(args.s_number_of_sentences, length_range);
+		match output {
+			Ok(garbage) => display_text_bytes(garbage),
+			Err(e) => println!("{}", e),
+		}
+	} else {
+		let markov_chain = MarkovChain::from_grouped_data(format_input(&input_data));
+		let output = markov_chain.generate(args.s_number_of_sentences, length_range);
+		match output {
+			Ok(text) => display_words(text),
+			Err(e) => println!("{}", e),
+		}
+	}
 }

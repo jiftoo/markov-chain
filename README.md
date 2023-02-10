@@ -2,7 +2,7 @@
 # A Markov chain text generator written in Rust 🚀
 It's messy, but gets the job done!
 
-Note: input and generation parameters are hard-coded into the executable. I'm not currently planning to implement a user interface.
+Note: input and generation parameters are hard-coded into the executable.
  ## Generation
 1. Input: `gpt_nonesense.txt` - short text by GPT-3
   Output:
