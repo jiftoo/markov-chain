@@ -4,6 +4,7 @@ use std::io::Read;
 
 use clap::arg;
 use clap::command;
+use clap::CommandFactory;
 use clap::Parser;
 use input::format_input;
 use markov::MarkovChain;
@@ -88,8 +89,22 @@ fn read_input(args: &Args) -> Result<String, String> {
 	}
 }
 
+fn print_help_and_abort() -> ! {
+	let mut cmd = Args::command();
+	cmd.print_long_help();
+	std::process::exit(1);
+}
+
 fn main() {
-	let args = Args::parse();
+	let Ok(args) = Args::try_parse() else {
+		print_help_and_abort();
+	};
+	if args.input.is_empty() {
+		println!("No input provided!");
+		print_help_and_abort();
+	}
+
+	println!("213");
 	let length_range = if args.t_number_of_tokens.contains('-') {
 		let range = args
 			.t_number_of_tokens
