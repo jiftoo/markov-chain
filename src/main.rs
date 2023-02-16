@@ -104,7 +104,6 @@ fn main() {
 		print_help_and_abort();
 	}
 
-	println!("213");
 	let length_range = if args.t_number_of_tokens.contains('-') {
 		let range = args
 			.t_number_of_tokens
